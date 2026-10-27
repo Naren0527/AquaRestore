@@ -1,6 +1,27 @@
+# Python virtual environments
+
 .venv/
+venv/
+
+# Python cache files
+
 __pycache__/
 .pytest_cache/
 *.py[cod]
+
+# Environment variables and local configuration
+
+.env
+.env.*
+
+# Generated experiment data and outputs
+
 data/
 outputs/
+test_samples/
+test_outputs/
+
+# OS-generated files
+
+.DS_Store
+Thumbs.db
