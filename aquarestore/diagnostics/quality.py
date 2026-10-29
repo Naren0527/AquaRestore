@@ -4,7 +4,9 @@
 import cv2
 import numpy as np
 
-from aquarestore.contracts import Image, QualityMetrics
+from aquarestore.types import Image
+from aquarestore.contracts import QualityMetrics
+
 
 
 def calculate_quality_metrics(image: Image) -> QualityMetrics:

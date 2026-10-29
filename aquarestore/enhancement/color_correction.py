@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 
-from aquarestore.contracts import Image
+from aquarestore.types import Image
+
 
 
 def correct_color(image: Image, strength: float = 0.35) -> Image:

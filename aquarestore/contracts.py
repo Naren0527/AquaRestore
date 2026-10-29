@@ -6,7 +6,6 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-
 Image: TypeAlias = NDArray[np.uint8]
 
 
@@ -46,7 +45,7 @@ def _validate_image(image: Image, name: str = "image") -> None:
 
 
 def correct_color(image: Image) -> Image:
-    """Apply the configured color correction to an RGB uint8 image."""
+    """Apply color correction to an RGB uint8 image."""
     from aquarestore.enhancement.color_correction import (
         correct_color as implementation,
     )
@@ -74,13 +73,13 @@ def enhance_contrast(
 def denoise_image(
     image: Image,
     diameter: int = 9,
-    sigma_color: float = 50.0,
-    sigma_space: float = 50.0,
+    sigma_color: float = 75.0,
+    sigma_space: float = 75.0,
 ) -> Image:
-    """Apply edge-preserving bilateral denoising to an RGB image."""
+    """Apply bilateral denoising to an RGB image."""
     _validate_image(image)
 
-    if isinstance(diameter, bool) or not isinstance(
+    if isinstance(diameter, (bool, np.bool_)) or not isinstance(
         diameter, (int, np.integer)
     ):
         raise TypeError("diameter must be an integer")
@@ -100,16 +99,12 @@ def denoise_image(
         if not np.isfinite(value) or value <= 0:
             raise ValueError(f"{name} must be finite and positive")
 
-    # OpenCV's bilateral filter operates on the supplied channel order;
-    # RGB input and output are preserved.
-    result = cv2.bilateralFilter(
+    return cv2.bilateralFilter(
         image,
         d=int(diameter),
         sigmaColor=float(sigma_color),
         sigmaSpace=float(sigma_space),
     )
-
-    return result
 
 
 def calculate_quality_metrics(image: Image) -> QualityMetrics:
@@ -135,6 +130,7 @@ def calculate_quality_metrics(image: Image) -> QualityMetrics:
 
     grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+
     edge_strength = float(
         np.mean(np.sqrt(grad_x**2 + grad_y**2))
     )
@@ -155,48 +151,32 @@ def enhance_image(
 ) -> EnhancementResult:
     """
     Run AquaRestore and return the enhanced image with diagnostics.
-
-    The returned metrics are basic image statistics, not a claim
-    of perceptual quality or reference-based accuracy.
     """
     _validate_image(image)
 
     if not isinstance(adaptive, (bool, np.bool_)):
         raise TypeError("adaptive must be a boolean")
 
-    from aquarestore.enhancement.adaptive import (
-        measure_luminance_contrast,
-        select_clip_limit,
+    # Lazy imports prevent a contracts/pipeline circular import.
+    from aquarestore.enhancement.color_correction import (
+        correct_color as color_impl,
     )
-    from aquarestore.enhancement.color_correction import correct_color as color_impl
     from aquarestore.enhancement.pipeline import (
         enhance_image as pipeline_impl,
+        select_pipeline_clip_limit,
     )
 
     original = image.copy()
     metrics_before = calculate_quality_metrics(original)
 
-    # Mirror the pipeline's current parameter-selection rule so the
-    # result records the selected CLAHE clip limit.
     corrected = color_impl(original)
+    clip_limit = select_pipeline_clip_limit(corrected, bool(adaptive))
 
-    if adaptive:
-        measured_contrast = measure_luminance_contrast(corrected)
-        clip_limit = select_clip_limit(
-            measured_contrast,
-            minimum=1.0,
-            maximum=2.0,
-        )
-        method = "adaptive"
-    else:
-        clip_limit = 1.5
-        method = "fixed"
-
-    enhanced = pipeline_impl(original, adaptive=adaptive)
+    enhanced = pipeline_impl(original, adaptive=bool(adaptive))
     metrics_after = calculate_quality_metrics(enhanced)
 
     parameters_used = {
-        "adaptive": adaptive,
+        "adaptive": bool(adaptive),
         "color_correction_strength": 0.35,
         "clip_limit": float(clip_limit),
         "tile_grid_size": (8, 8),
@@ -207,7 +187,7 @@ def enhance_image(
         metrics_before=metrics_before,
         metrics_after=metrics_after,
         parameters_used=parameters_used,
-        method=method,
+        method="adaptive" if adaptive else "fixed",
     )
 
 

@@ -4,7 +4,8 @@
 import cv2
 import numpy as np
 
-from aquarestore.contracts import Image
+from aquarestore.types import Image
+
 
 
 def denoise_image(

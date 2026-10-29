@@ -2,8 +2,9 @@
 import cv2
 import numpy as np
 
-from aquarestore.contracts import Image
+from aquarestore.types import Image
 from aquarestore.enhancement import contrast
+
 
 
 def measure_luminance_contrast(image: Image) -> float:
