@@ -43,3 +43,4 @@ def test_validation_threshold_parameter():
 
     res_low = validate_aquatic_image(img, threshold=0.50)
     assert res_low.threshold == 0.50
+

@@ -100,3 +100,4 @@ def test_inference_with_mocked_model(monkeypatch):
     assert res.is_aquatic is False
     assert res.accepted is False
     assert "Unsupported Image" in res.message
+
