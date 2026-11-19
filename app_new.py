@@ -31,7 +31,10 @@ from PIL import Image as PILImage
 from PIL import ImageDraw
 import streamlit.components.v1 as components
 
-from aquarestore.contracts import calculate_quality_metrics
+from aquarestore.contracts import (
+    calculate_quality_metrics,
+    validate_aquatic_image,
+)
 from aquarestore.enhancement.pipeline import enhance_image
 
 
@@ -870,7 +873,7 @@ def encode_png(image: np.ndarray) -> bytes:
     return buffer.getvalue()
 
 
-def process_image(original: np.ndarray) -> dict:
+def process_image(original: np.ndarray, classification: object = None) -> dict:
     """Run both enhancement modes and calculate their metrics."""
     start = time.perf_counter()
     fixed = enhance_image(original, adaptive=False)
@@ -890,6 +893,13 @@ def process_image(original: np.ndarray) -> dict:
                 f"{name} enhancement returned an invalid image."
             )
 
+    is_accepted = getattr(classification, "accepted", True)
+    confidence = getattr(classification, "confidence", 1.0)
+    aq_prob = getattr(classification, "aquatic_probability", 1.0)
+    non_aq_prob = getattr(classification, "non_aquatic_probability", 0.0)
+    thresh = getattr(classification, "threshold", 0.85)
+    msg = getattr(classification, "message", "Aquatic content verified.")
+
     return {
         "original": original.copy(),
         "fixed": fixed,
@@ -899,6 +909,12 @@ def process_image(original: np.ndarray) -> dict:
         "original_metrics": get_metrics(original),
         "fixed_metrics": get_metrics(fixed),
         "adaptive_metrics": get_metrics(adaptive),
+        "validation_status": "ACCEPTED" if is_accepted else "REJECTED",
+        "validation_confidence": confidence,
+        "aquatic_probability": aq_prob,
+        "non_aquatic_probability": non_aq_prob,
+        "validation_threshold": thresh,
+        "validation_message": msg,
     }
 
 
@@ -1053,8 +1069,20 @@ def get_png(result: dict, key: str) -> bytes:
 def reset_workspace() -> None:
     """Clear the loaded image and cached results; show a fresh uploader."""
     for key in (
-        "aq_result", "aq_previews", "aq_name", "aq_size",
-        "aq_exports", "aq_hist", "aq_err",
+        "aq_result",
+        "aq_previews",
+        "aq_name",
+        "aq_size",
+        "aq_exports",
+        "aq_hist",
+        "aq_err",
+        "aq_val_status",
+        "aq_val_confidence",
+        "aq_val_threshold",
+        "aq_val_is_aquatic",
+        "aq_val_msg",
+        "aq_val_prob_aq",
+        "aq_val_prob_non_aq",
     ):
         st.session_state.pop(key, None)
     st.session_state["aq_gen"] = st.session_state.get("aq_gen", 0) + 1
@@ -1229,9 +1257,19 @@ def render_landing(tool: dict):
             key=f"aq_upload_{st.session_state.get('aq_gen', 0)}",
         )
         md(
-            '<div class="upnote">PNG, JPEG, BMP or TIFF &middot; up to 200 MB '
-            "&middot; processed locally and never uploaded</div>"
+            '<div class="upnote">AquaRestore Aquatic Intelligence &middot; '
+            'Deep learning classifier validates water scenes (&ge;85% confidence) before enhancement</div>'
         )
+        with st.expander("Aquatic Image Classifier Settings", expanded=False):
+            st.slider(
+                "Confidence Acceptance Threshold (%)",
+                min_value=50,
+                max_value=99,
+                value=int(st.session_state.get("aq_threshold_pct", 85)),
+                step=1,
+                key="aq_threshold_pct",
+                help="Minimum confidence required to accept an aquatic image. Default 85% achieves 0% false positives for non-aquatic scenes.",
+            )
     return landing, uploaded
 
 
@@ -1239,8 +1277,8 @@ def render_processing() -> None:
     md(
         """
         <div class="proc">
-            <div class="pt">Processing image</div>
-            <div class="ps">Running fixed and adaptive enhancement and measuring quality.</div>
+            <div class="pt">Validating Aquatic Environment</div>
+            <div class="ps">Running deep learning classifier to verify aquatic content before executing color correction and CLAHE...</div>
             <div class="lbar"><i></i></div>
         </div>
         """
@@ -1248,15 +1286,52 @@ def render_processing() -> None:
 
 
 def render_error() -> None:
-    md(
-        f"""
-        <div class="err">
-            <div class="et">This image could not be processed</div>
-            <div class="em">{escape(st.session_state.get('aq_err', 'Unknown error.'))}</div>
-            <div class="eh">Confirm the file is a valid PNG, JPEG, BMP or TIFF image, then try again with another file.</div>
-        </div>
-        """
-    )
+    is_rejection = st.session_state.get("aq_val_status") == "REJECTED"
+    if is_rejection:
+        confidence = float(st.session_state.get("aq_val_confidence", 0.0))
+        thresh = float(st.session_state.get("aq_val_threshold", 0.85))
+        non_aq_prob = float(st.session_state.get("aq_val_prob_non_aq", 0.0))
+        aq_prob = float(st.session_state.get("aq_val_prob_aq", 0.0))
+        err_msg = st.session_state.get("aq_err", "Image rejected by aquatic classifier.")
+
+        md(
+            f"""
+            <div class="err" style="border-left: 5px solid #e5322d; max-width:740px;">
+                <div class="et" style="color:#c9231f;">Non-Aquatic Image Rejected</div>
+                <div class="em" style="font-size:13.5px; color:#1a1a1a; background:#fdf2f2; border:1px solid #f8d7da; border-radius:10px; padding:14px;">
+                    <strong>Classifier Decision:</strong><br>{escape(err_msg)}
+                </div>
+                <div style="margin: 16px 0; padding: 14px 18px; background:#fff; border: 1px solid var(--line); border-radius: 12px;">
+                    <div style="font-size:11.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:10px;">Deep Learning Classification Details</div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;">
+                        <span>Pipeline Status:</span> <strong style="color:#c9231f;">REJECTED BEFORE ENHANCEMENT</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;">
+                        <span>Aquatic Probability:</span> <span>{aq_prob:.1%}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;">
+                        <span>Non-Aquatic Probability:</span> <span>{non_aq_prob:.1%}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;">
+                        <span>Required Confidence Threshold:</span> <span>{thresh:.1%}</span>
+                    </div>
+                </div>
+                <div class="eh">
+                    AquaRestore is designed specifically for aquatic and water-containing images (underwater photographs, oceans, rivers, lakes, swimming pools, waterfalls, marine animals, and coral reefs). Ordinary photographs (portraits, architecture, roads, vehicles, indoor scenes, or landscapes without visible water) are rejected to preserve domain-specific enhancement quality.
+                </div>
+            </div>
+            """
+        )
+    else:
+        md(
+            f"""
+            <div class="err">
+                <div class="et">This image could not be processed</div>
+                <div class="em">{escape(st.session_state.get('aq_err', 'Unknown error.'))}</div>
+                <div class="eh">Confirm the file is a valid PNG, JPEG, BMP or TIFF image, then try again with another file.</div>
+            </div>
+            """
+        )
     _left, middle, _right = st.columns([1, 1, 1])
     with middle:
         st.button(
@@ -1376,8 +1451,27 @@ def panel_sections(name, size, previews, result, key, histogram) -> str:
 
     tone = TONE_OF[key]
     shown = key.capitalize()
+
+    val_status = result.get("validation_status", "ACCEPTED")
+    confidence = float(result.get("validation_confidence", 1.0))
+    aq_prob = float(result.get("aquatic_probability", 1.0))
+    threshold = float(result.get("validation_threshold", 0.85))
+
+    aquatic_block = (
+        f"""<div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <span class="dot" style="background:#3f9a74;"></span>
+            <span style="font-weight:700; color:#2d7d5a; font-size:13.5px;">Aquatic Scene Verified (&ge;{threshold:.0%})</span>
+        </div>"""
+        + kv("Validation Status", "Accepted (Pre-enhancement)")
+        + kv("Confidence", f"{confidence:.1%}")
+        + kv("Aquatic Probability", f"{aq_prob:.1%}")
+        + kv("Classifier", "MobileNetV3 (ImageNet Pretrained)")
+        + '<div class="note" style="margin-top:8px">Visual content verified by AI before running color correction and contrast enhancement.</div>'
+    )
+
     return f"""
     <div class="psec first"><div class="ih"><span>Image</span></div>{image_block}</div>
+    <div class="psec"><div class="ih"><span>Aquatic Intelligence</span></div>{aquatic_block}</div>
     <div class="psec">
         <div class="ih"><span>Histogram</span><span class="hm"><i class="tdot t-{tone}"></i>{escape(shown)}</span></div>
         {histogram}
@@ -1622,59 +1716,81 @@ if tool_id is None:
     st.markdown(f"<style>{CENTERED_CSS}</style>", unsafe_allow_html=True)
     render_home()
     st.stop()
+else:
+    tool = TOOLS[tool_id]
+    state = st.session_state
 
-tool = TOOLS[tool_id]
-state = st.session_state
+    if "aq_result" not in state:
+        st.markdown(f"<style>{CENTERED_CSS}</style>", unsafe_allow_html=True)
 
-if "aq_result" not in state:
-    st.markdown(f"<style>{CENTERED_CSS}</style>", unsafe_allow_html=True)
+        if state.get("aq_err"):
+            render_error()
+            st.stop()
 
-    if state.get("aq_err"):
-        render_error()
-        st.stop()
+        landing, uploaded_file = render_landing(tool)
+        if uploaded_file is None:
+            footer()
+            st.stop()
 
-    landing, uploaded_file = render_landing(tool)
-    if uploaded_file is None:
-        footer()
-        st.stop()
+        landing.empty()
+        loading = st.empty()
+        with loading.container():
+            render_processing()
 
-    landing.empty()
-    loading = st.empty()
-    with loading.container():
-        render_processing()
+        try:
+            original = load_rgb_image(uploaded_file)
 
-    try:
-        original = load_rgb_image(uploaded_file)
-        result = process_image(original)
-        previews = build_previews(result)
-    except Exception as exc:
-        state["aq_err"] = f"{type(exc).__name__}: {exc}"
+            # 1. Aquatic Image Intelligence: Validate BEFORE Enhancement Pipeline
+            thresh_pct = state.get("aq_threshold_pct", 85)
+            threshold = float(thresh_pct) / 100.0
+
+            val_result = validate_aquatic_image(original, threshold=threshold)
+
+            state["aq_val_status"] = "ACCEPTED" if val_result.accepted else "REJECTED"
+            state["aq_val_confidence"] = val_result.confidence
+            state["aq_val_threshold"] = threshold
+            state["aq_val_is_aquatic"] = val_result.is_aquatic
+            state["aq_val_msg"] = val_result.message
+            state["aq_val_prob_aq"] = val_result.aquatic_probability
+            state["aq_val_prob_non_aq"] = val_result.non_aquatic_probability
+
+            if not val_result.accepted:
+                # Explicitly reject and never pass image to enhancement pipeline
+                state["aq_err"] = val_result.message
+                loading.empty()
+                st.rerun()
+
+            # 2. Proceed to AquaRestore enhancement pipeline only after verified acceptance
+            result = process_image(original, classification=val_result)
+            previews = build_previews(result)
+        except Exception as exc:
+            state["aq_err"] = f"{type(exc).__name__}: {exc}"
+            loading.empty()
+            st.rerun()
+
+        state["aq_result"] = result
+        state["aq_previews"] = previews
+        state["aq_name"] = uploaded_file.name
+        state["aq_size"] = uploaded_file.size
+        state["aq_exports"] = {}
+        state["aq_hist"] = {}
         loading.empty()
         st.rerun()
 
-    state["aq_result"] = result
-    state["aq_previews"] = previews
-    state["aq_name"] = uploaded_file.name
-    state["aq_size"] = uploaded_file.size
-    state["aq_exports"] = {}
-    state["aq_hist"] = {}
-    loading.empty()
-    st.rerun()
+    result = state["aq_result"]
+    name = state["aq_name"]
+    size = state["aq_size"]
 
-result = state["aq_result"]
-name = state["aq_name"]
-size = state["aq_size"]
+    if state["aq_previews"].get("v") != PREVIEW_VERSION:
+        state["aq_previews"] = build_previews(result)
+        state["aq_hist"] = {}
+    previews = state["aq_previews"]
 
-if state["aq_previews"].get("v") != PREVIEW_VERSION:
-    state["aq_previews"] = build_previews(result)
-    state["aq_hist"] = {}
-previews = state["aq_previews"]
-
-if tool_id in ("analysis", "export"):
-    st.markdown(f"<style>{CENTERED_CSS}</style>", unsafe_allow_html=True)
-    if tool_id == "analysis":
-        render_analysis_page(tool, name, previews, result)
+    if tool_id in ("analysis", "export"):
+        st.markdown(f"<style>{CENTERED_CSS}</style>", unsafe_allow_html=True)
+        if tool_id == "analysis":
+            render_analysis_page(tool, name, previews, result)
+        else:
+            render_export_page(tool, name, previews, result)
     else:
-        render_export_page(tool, name, previews, result)
-else:
-    render_workspace(tool_id, tool, name, size, previews, result)
+        render_workspace(tool_id, tool, name, size, previews, result)

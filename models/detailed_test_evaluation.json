@@ -1,0 +1,103 @@
+{
+  "model_path": "models\\aquatic_classifier.pth",
+  "test_dataset_size": 204,
+  "roc_auc": 0.8485198000768935,
+  "threshold_analysis": [
+    {
+      "threshold": 0.5,
+      "accuracy": 0.8186274509803921,
+      "precision": 0.9113924050632911,
+      "recall": 0.7058823529411765,
+      "f1_score": 0.7955801104972375,
+      "false_positive_rate": 0.06862745098039216,
+      "true_positives": 72,
+      "false_positives": 7,
+      "true_negatives": 95,
+      "false_negatives": 30
+    },
+    {
+      "threshold": 0.6,
+      "accuracy": 0.8186274509803921,
+      "precision": 0.9333333333333333,
+      "recall": 0.6862745098039216,
+      "f1_score": 0.7909604519774012,
+      "false_positive_rate": 0.049019607843137254,
+      "true_positives": 70,
+      "false_positives": 5,
+      "true_negatives": 97,
+      "false_negatives": 32
+    },
+    {
+      "threshold": 0.7,
+      "accuracy": 0.803921568627451,
+      "precision": 0.9428571428571428,
+      "recall": 0.6470588235294118,
+      "f1_score": 0.7674418604651163,
+      "false_positive_rate": 0.0392156862745098,
+      "true_positives": 66,
+      "false_positives": 4,
+      "true_negatives": 98,
+      "false_negatives": 36
+    },
+    {
+      "threshold": 0.75,
+      "accuracy": 0.7990196078431373,
+      "precision": 0.9692307692307692,
+      "recall": 0.6176470588235294,
+      "f1_score": 0.7544910179640718,
+      "false_positive_rate": 0.0196078431372549,
+      "true_positives": 63,
+      "false_positives": 2,
+      "true_negatives": 100,
+      "false_negatives": 39
+    },
+    {
+      "threshold": 0.8,
+      "accuracy": 0.803921568627451,
+      "precision": 0.984375,
+      "recall": 0.6176470588235294,
+      "f1_score": 0.7590361445783133,
+      "false_positive_rate": 0.00980392156862745,
+      "true_positives": 63,
+      "false_positives": 1,
+      "true_negatives": 101,
+      "false_negatives": 39
+    },
+    {
+      "threshold": 0.85,
+      "accuracy": 0.8088235294117647,
+      "precision": 1.0,
+      "recall": 0.6176470588235294,
+      "f1_score": 0.7636363636363637,
+      "false_positive_rate": 0.0,
+      "true_positives": 63,
+      "false_positives": 0,
+      "true_negatives": 102,
+      "false_negatives": 39
+    },
+    {
+      "threshold": 0.9,
+      "accuracy": 0.7990196078431373,
+      "precision": 1.0,
+      "recall": 0.5980392156862745,
+      "f1_score": 0.7484662576687117,
+      "false_positive_rate": 0.0,
+      "true_positives": 61,
+      "false_positives": 0,
+      "true_negatives": 102,
+      "false_negatives": 41
+    },
+    {
+      "threshold": 0.95,
+      "accuracy": 0.7598039215686274,
+      "precision": 1.0,
+      "recall": 0.5196078431372549,
+      "f1_score": 0.6838709677419355,
+      "false_positive_rate": 0.0,
+      "true_positives": 53,
+      "false_positives": 0,
+      "true_negatives": 102,
+      "false_negatives": 49
+    }
+  ]
+}

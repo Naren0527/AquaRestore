@@ -44,6 +44,19 @@ def _validate_image(image: Image, name: str = "image") -> None:
         raise ValueError(f"{name} must not be empty")
 
 
+def validate_aquatic_image(
+    image: Image,
+    threshold: float = 0.85,
+) -> Any:
+    """Validate that an input RGB uint8 image contains aquatic / water content."""
+    _validate_image(image)
+    from aquarestore.classification.validation import (
+        validate_aquatic_image as implementation,
+    )
+
+    return implementation(image, threshold=threshold)
+
+
 def correct_color(image: Image) -> Image:
     """Apply color correction to an RGB uint8 image."""
     from aquarestore.enhancement.color_correction import (
@@ -148,14 +161,28 @@ def calculate_quality_metrics(image: Image) -> QualityMetrics:
 def enhance_image(
     image: Image,
     adaptive: bool = True,
+    validate_aquatic: bool = False,
+    threshold: float = 0.85,
 ) -> EnhancementResult:
     """
     Run AquaRestore and return the enhanced image with diagnostics.
+
+    If validate_aquatic is True, the image is passed through the deep learning
+    aquatic classifier before reaching color correction or CLAHE. If rejected,
+    a ValueError is raised with the classifier error message.
     """
     _validate_image(image)
 
     if not isinstance(adaptive, (bool, np.bool_)):
         raise TypeError("adaptive must be a boolean")
+
+    if not isinstance(validate_aquatic, (bool, np.bool_)):
+        raise TypeError("validate_aquatic must be a boolean")
+
+    if validate_aquatic:
+        val_result = validate_aquatic_image(image, threshold=threshold)
+        if not val_result.accepted:
+            raise ValueError(val_result.message)
 
     # Lazy imports prevent a contracts/pipeline circular import.
     from aquarestore.enhancement.color_correction import (
