@@ -1,27 +1,46 @@
 # Python virtual environments
-
 .venv/
 venv/
+env/
 
 # Python cache files
-
 __pycache__/
 .pytest_cache/
 *.py[cod]
+*$py.class
 
 # Environment variables and local configuration
-
 .env
 .env.*
 
-# Generated experiment data and outputs
+# Temporary, archive, and log files
+*.zip
+*.tar.gz
+*.log
+*.tmp
+*.bak
 
+# IDE & editor caches
+.vscode/
+.idea/
+
+# Datasets: ignore bulk splits, preserve dataset metadata, licenses & test samples
 data/
+!data/
+!data/dataset/
+data/dataset/*
+!data/dataset/*.json
+!data/samples/
+data/samples/*
+!data/samples/907_img_.png
+!data/samples/9557.png
+!data/samples/104_img_.png
+!data/samples/96_img_.png
+
 outputs/
 test_samples/
 test_outputs/
 
 # OS-generated files
-
 .DS_Store
 Thumbs.db

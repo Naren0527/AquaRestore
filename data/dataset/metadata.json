@@ -1,0 +1,22 @@
+{
+  "random_seed": 42,
+  "classes": [
+    "non_aquatic",
+    "aquatic"
+  ],
+  "class_mapping": {
+    "0": "non_aquatic",
+    "1": "aquatic"
+  },
+  "counts": {
+    "train_aquatic": 474,
+    "train_non_aquatic": 474,
+    "val_aquatic": 102,
+    "val_non_aquatic": 102,
+    "test_aquatic": 102,
+    "test_non_aquatic": 102
+  },
+  "total_images": 1356,
+  "aquatic_total": 678,
+  "non_aquatic_total": 678
+}
